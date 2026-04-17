@@ -13,12 +13,16 @@ Ce projet a pour objectif d'analyser les ilôts de chaleurs à Paris en fonction
 Pour faire fonctionner ce projet, vous devez :
 1. Télécharger les contours IRIS sur https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_CONTOURS-IRIS?redirected_from=geoservices.ign.fr.
 2. Dans Téléchargements et flux, choisissez le fichier Contours...IRIS en téléchargement. 
-3. Réglez les filtres tels que : 
+3. Réglez les filtres tels que :
+   
 ZONE = FXX France métropolitaine
+
 FORMAT = GPKG (Geopackage)
+
 CRS = RGF93 v1 / Lambert-93 -- France
+
 4. Téléchargez le fichier : CONTOURS-IRIS_3-0__GPKG_LAMB93_FXX_2026-01-01
-5. Vous trouverez un fichier `iris.gpkg` dans 
+5. Vous trouverez un fichier `iris.gpkg` dans `\CONTOURS-IRIS_3-0__GPKG_LAMB93_FXX_2026-01-01\CONTOURS-IRIS\1_DONNEES_LIVRAISON_2026-04-00088\CONTOURS-IRIS_3-0_GPKG_LAMB93_FXX-ED2026-01-01\iris.gpkg`
 6. Placer le fichier `iris.gpkg` dans le dossier nommé `data/` à la racine du projet.
 7. Le script filtrera automatiquement les données pour ne garder que Paris.
 
