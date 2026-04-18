@@ -1,4 +1,14 @@
 import geopandas as gpd
+import sys
+sys.path.append('../src')
+import utils
+import pandas as pd
+import s3fs
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from matplotlib.lines import Line2D
 
 ####################################################################################################
 # Jointure
@@ -633,3 +643,118 @@ def carte_densite_paris(gdf_iris_densite: gpd.GeoDataFrame,
     folium.LayerControl(collapsed=False).add_to(m)
 
     return m
+
+
+def preparer_clustring(df_arbres):
+    """Agrège les données des arbres par IRIS."""
+    # On utilise n'importe quelle colonne pour compter (ici 'code_iris' lui-même)
+    iris_stats = df_arbres.groupby('code_iris').agg({
+        'circonference_cm': ['mean', 'std'],
+        'hauteur_m': ['mean', 'max'],
+        'code_iris': 'count' 
+    }).reset_index()
+
+    iris_stats.columns = [
+        'code_iris', 'circ_moyenne', 'circ_std', 
+        'haut_moyenne', 'haut_max', 'nb_arbres'
+    ]
+    return iris_stats.fillna(0)
+
+def choix_k_coude(features_df, k_max=10):
+    """Calcule et affiche la méthode du coude."""
+    X = features_df.drop(columns=['code_iris'])
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    inertia = []
+    K_range = range(1, k_max + 1)
+    for k in K_range:
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(X_scaled)
+        inertia.append(kmeans.inertia_)
+        
+    plt.figure(figsize=(8, 5))
+    plt.plot(K_range, inertia, 'bx-')
+    plt.xlabel('Nombre de clusters (k)')
+    plt.ylabel('Inertie')
+    plt.title('Méthode du Coude')
+    plt.grid(True)
+    plt.show()
+
+def applique_clustering(features_df, n_clusters=4):
+    """Applique le clustering et retourne le DataFrame avec les labels."""
+    df = features_df.copy()
+    X = df.drop(columns=['code_iris'])
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    df['cluster'] = kmeans.fit_predict(X_scaled)
+    return df
+
+
+def plot_morpho(df, palette):
+    """Génère le scatter plot du profil morphologique des arbres."""
+    plt.figure(figsize=(10, 6))
+    
+    # On s'assure que le cluster est bien traité comme une catégorie pour le mapping couleur
+    sns.scatterplot(
+        data=df, 
+        x='circ_moyenne', 
+        y='haut_moyenne', 
+        hue='cluster', 
+        palette=palette, 
+        s=100, 
+        alpha=0.7
+    )
+
+    plt.title('Profil morphologique des arbres par Cluster')
+    plt.xlabel('Circonférence moyenne (cm)')
+    plt.ylabel('Hauteur moyenne (m)')
+    plt.legend(title='Cluster')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.show()
+
+def moyennes_cluster(df):
+    """Calcule et retourne les statistiques moyennes par cluster."""
+    # On s'assure de ne prendre que les colonnes numériques pour la moyenne
+    stats = df.groupby('cluster').mean(numeric_only=True)
+    return stats
+
+
+def plot_map_cluster(map_df, palette):
+    """Génère la carte choroplèthe finale des IRIS avec sa légende personnalisée."""
+    
+    # 1. Conversion sécurisée pour le mapping des couleurs
+    map_df['cluster_str'] = map_df['cluster'].astype(str)
+    
+    fig, ax = plt.subplots(figsize=(15, 12))
+
+    map_df.plot(
+        color=map_df['cluster_str'].map(palette).fillna('#D3D3D3'),
+        ax=ax,
+        edgecolor='black',
+        linewidth=0.1
+    )
+
+
+    # 3. Création de la légende manuelle 
+    legend_elements = [
+        Line2D([0], [0], marker='s', color='w', label='Zones minérales / Jeunes (C1)', 
+               markerfacecolor=palette.get('2', '#e5f5e0'), markersize=15),
+        Line2D([0], [0], marker='s', color='w', label='Quartiers moyennement arborés (C2)', 
+               markerfacecolor=palette.get('0', '#a1d99b'), markersize=15),
+        Line2D([0], [0], marker='s', color='w', label='Patrimoine arboré dense (C0)', 
+               markerfacecolor=palette.get('1', '#41ab5d'), markersize=15),
+        Line2D([0], [0], marker='s', color='w', label='Bois de Paris (C3)', 
+               markerfacecolor=palette.get('3', '#00441b'), markersize=15),
+        Line2D([0], [0], marker='s', color='w', label='Aucun arbre recensé', 
+               markerfacecolor=palette.get('Sans arbres', '#D3D3D3'), markersize=15)
+    ]
+    
+    ax.legend(handles=legend_elements, loc='upper left', title="Typologie végétale")
+
+    plt.title("Analyse du patrimoine arboré par IRIS à Paris", fontsize=16)
+    plt.axis('off')
+    plt.show()
